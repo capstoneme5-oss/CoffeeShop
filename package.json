@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "build": "echo 'Build complete'",
     "migrate": "sequelize db:migrate",
     "seed": "sequelize db:seed:all"
   },

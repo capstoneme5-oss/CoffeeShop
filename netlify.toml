@@ -1,9 +1,7 @@
-[[toml]]
 [build]
   functions = "netlify/functions"
-  publish = "dist"
+  command = "npm run build"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[dev]
+  command = "npm run dev"
+  port = 3000
