@@ -83,6 +83,15 @@ class CoffeeshopController {
     // Menu operations
     async getMenu(req, res) {
         try {
+            // If running on Netlify (serverless), force using bundled sample data
+            if (process.env.NETLIFY) {
+                try {
+                    const data = require('../data/menu.json');
+                    return res.json(Array.isArray(data) ? data.filter(i => i.available) : []);
+                } catch (e) {
+                    console.warn('Failed to load bundled sample menu on Netlify:', e && e.message ? e.message : e);
+                }
+            }
             const menuItems = await db.Menu.findAll({
                 where: { available: true },
             });
@@ -105,6 +114,20 @@ class CoffeeshopController {
 
     async getBestsellers(req, res) {
         try {
+            // If running on Netlify (serverless), force using bundled sample data
+            if (process.env.NETLIFY) {
+                try {
+                    const data = require('../data/menu.json');
+                    const limit = req.query.limit || 6;
+                    if (Array.isArray(data)) {
+                        const sellers = data.filter(i => i.available && i.isBestseller).sort((a,b) => (b.salesCount||0)-(a.salesCount||0)).slice(0, parseInt(limit));
+                        return res.json(sellers);
+                    }
+                    return res.json([]);
+                } catch (e) {
+                    console.warn('Failed to load bundled sample bestsellers on Netlify:', e && e.message ? e.message : e);
+                }
+            }
             const limit = req.query.limit || 6;
             const bestsellers = await db.Menu.findAll({
                 where: { 
