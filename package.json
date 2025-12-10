@@ -11,10 +11,11 @@
     "seed": "sequelize db:seed:all"
   },
   "dependencies": {
-    "express": "^4.17.1",
-    "sequelize": "^6.6.5",
-    "mysql2": "^2.2.5",
+    "@netlify/plugin-nextjs": "^5.15.1",
     "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "mysql2": "^2.2.5",
+    "sequelize": "^6.6.5",
     "serverless-http": "^3.0.2"
   },
   "devDependencies": {
