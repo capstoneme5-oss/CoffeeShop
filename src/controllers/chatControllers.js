@@ -52,7 +52,21 @@ class CoffeeshopController {
                 message: savedMessage
             });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            console.error('getBotResponse error:', error && error.message ? error.message : error);
+
+            // Attempt to return a friendly fallback response so the frontend always shows something.
+            const fallback = "Sorry, I'm having trouble answering right now. Please try again soon or check our menu above.";
+
+            try {
+                // Try to persist fallback message if DB is available
+                if (db && db.Message && typeof db.Message.create === 'function') {
+                    await db.Message.create({ content: fallback, sender: 'bot' });
+                }
+            } catch (persistErr) {
+                console.warn('Failed to persist fallback bot message:', persistErr && persistErr.message ? persistErr.message : persistErr);
+            }
+
+            res.json({ response: fallback, message: null });
         }
     }
 
