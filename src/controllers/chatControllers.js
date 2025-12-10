@@ -35,22 +35,32 @@ class CoffeeshopController {
                 return res.status(400).json({ error: 'userMessage is required' });
             }
 
-            // Get menu items for context
-            const menuItems = await db.Menu.findAll();
-            
-            // Generate bot response
-            const botResponse = await chatbotService.getContextualResponse(userMessage, menuItems);
-            
-            // Save bot response
-            const savedMessage = await db.Message.create({
-                content: botResponse,
-                sender: 'bot',
-            });
+            // Attempt to get menu items for context, but continue if DB access fails
+            let menuItems = [];
+            try {
+                if (db && db.Menu && typeof db.Menu.findAll === 'function') {
+                    menuItems = await db.Menu.findAll();
+                }
+            } catch (menuErr) {
+                console.warn('Could not fetch menu for bot context:', menuErr && menuErr.message ? menuErr.message : menuErr);
+                menuItems = [];
+            }
 
-            res.json({
-                response: botResponse,
-                message: savedMessage
-            });
+            // Generate bot response (will use internal knowledgeBase if menu empty)
+            const botResponse = await chatbotService.getContextualResponse(userMessage, menuItems);
+
+            // Try to persist bot response, but do not fail if DB is unavailable
+            let savedMessage = null;
+            try {
+                if (db && db.Message && typeof db.Message.create === 'function') {
+                    savedMessage = await db.Message.create({ content: botResponse, sender: 'bot' });
+                }
+            } catch (persistErr) {
+                console.warn('Failed to persist bot message:', persistErr && persistErr.message ? persistErr.message : persistErr);
+                savedMessage = null;
+            }
+
+            res.json({ response: botResponse, message: savedMessage });
         } catch (error) {
             console.error('getBotResponse error:', error && error.message ? error.message : error);
 
