@@ -34,6 +34,11 @@ function formatCurrency(amount) {
 async function loadBestsellers() {
     try {
         const response = await fetch(`${API_BASE}/bestsellers?limit=6`);
+        if (!response.ok) {
+            console.error('Bestsellers fetch failed', response.status, response.statusText);
+            document.getElementById('bestsellersGrid').innerHTML = `<p>Error loading bestsellers (${response.status})</p>`;
+            return;
+        }
         const bestsellers = await response.json();
         renderBestsellers(bestsellers);
     } catch (error) {
@@ -85,6 +90,11 @@ function addBestsellerToCart(event, itemId, itemName, itemPrice) {
 async function loadMenu() {
     try {
         const response = await fetch(`${API_BASE}/menu`);
+        if (!response.ok) {
+            console.error('Menu fetch failed', response.status, response.statusText);
+            document.getElementById('menuGrid').innerHTML = `<p>Error loading menu (${response.status})</p>`;
+            return;
+        }
         menuItems = await response.json();
         renderMenu(menuItems);
     } catch (error) {
@@ -303,6 +313,10 @@ function closeConfirmationModal() {
 async function loadChatHistory() {
     try {
         const response = await fetch(`${API_BASE}/messages`);
+        if (!response.ok) {
+            console.error('Messages fetch failed', response.status, response.statusText);
+            return;
+        }
         const messages = await response.json();
         
         // Display bot's initial greeting if no messages
