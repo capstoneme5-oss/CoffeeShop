@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const chatRoutes = require('./routes/chatRoutes');
 const logger = require('./utils/logger');
 
@@ -11,12 +12,20 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(logger);
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../public')));
+// Serve static files with error handling
+const publicPath = path.join(__dirname, '../public');
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+}
 
 // Routes
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/index.html'));
+    const indexPath = path.join(__dirname, '../public/index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.json({ message: 'Welcome to CoffeeShop API', health: 'ok' });
+    }
 });
 
 app.get('/health', (req, res) => {
