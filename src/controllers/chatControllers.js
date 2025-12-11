@@ -1,4 +1,5 @@
 const db = require('../models');
+const firebaseClient = require('../services/firebaseClient');
 const ChatbotService = require('../services/chatbot');
 
 const chatbotService = new ChatbotService(db);
@@ -35,10 +36,12 @@ class CoffeeshopController {
                 return res.status(400).json({ error: 'userMessage is required' });
             }
 
-            // Attempt to get menu items for context, but continue if DB access fails
+            // Attempt to get menu items for context, prefer Firebase when enabled
             let menuItems = [];
             try {
-                if (db && db.Menu && typeof db.Menu.findAll === 'function') {
+                if (process.env.USE_FIREBASE === 'true') {
+                    menuItems = await firebaseClient.getMenuItems();
+                } else if (db && db.Menu && typeof db.Menu.findAll === 'function') {
                     menuItems = await db.Menu.findAll();
                 }
             } catch (menuErr) {
@@ -52,7 +55,9 @@ class CoffeeshopController {
             // Try to persist bot response, but do not fail if DB is unavailable
             let savedMessage = null;
             try {
-                if (db && db.Message && typeof db.Message.create === 'function') {
+                if (process.env.USE_FIREBASE === 'true') {
+                    savedMessage = await firebaseClient.createMessage({ content: botResponse, sender: 'bot' });
+                } else if (db && db.Message && typeof db.Message.create === 'function') {
                     savedMessage = await db.Message.create({ content: botResponse, sender: 'bot' });
                 }
             } catch (persistErr) {
@@ -83,7 +88,12 @@ class CoffeeshopController {
     // Menu operations
     async getMenu(req, res) {
         try {
-            // If running on Netlify (serverless), force using bundled sample data
+            // If Firebase is enabled, return Firebase menu
+            if (process.env.USE_FIREBASE === 'true') {
+                const fbItems = await firebaseClient.getMenuItems();
+                if (fbItems && fbItems.length > 0) return res.json(fbItems);
+            }
+            // If running on Netlify without DB, prefer bundled sample
             if (process.env.NETLIFY) {
                 try {
                     const data = require('../data/menu.json');
@@ -92,6 +102,7 @@ class CoffeeshopController {
                     console.warn('Failed to load bundled sample menu on Netlify:', e && e.message ? e.message : e);
                 }
             }
+
             const menuItems = await db.Menu.findAll({
                 where: { available: true },
             });
@@ -114,7 +125,13 @@ class CoffeeshopController {
 
     async getBestsellers(req, res) {
         try {
-            // If running on Netlify (serverless), force using bundled sample data
+            // If Firebase is enabled, return Firebase bestsellers
+            if (process.env.USE_FIREBASE === 'true') {
+                const fbSellers = await firebaseClient.getBestsellers(req.query.limit || 6);
+                if (fbSellers && fbSellers.length > 0) return res.json(fbSellers);
+            }
+
+            // If running on Netlify without DB, prefer bundled sample
             if (process.env.NETLIFY) {
                 try {
                     const data = require('../data/menu.json');
@@ -128,6 +145,7 @@ class CoffeeshopController {
                     console.warn('Failed to load bundled sample bestsellers on Netlify:', e && e.message ? e.message : e);
                 }
             }
+
             const limit = req.query.limit || 6;
             const bestsellers = await db.Menu.findAll({
                 where: { 
