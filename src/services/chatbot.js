@@ -258,6 +258,8 @@ class ChatbotService {
                     'Have a wonderful day! Come back to BrewHeaven Cafe soon. We appreciate your business! 😊☕'
                 ]
             }
+        };
+    }
 
     async generateResponse(userMessage, menuItems = []) {
         const lowerMessage = userMessage.toLowerCase();
