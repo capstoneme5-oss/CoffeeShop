@@ -32,6 +32,28 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Debug endpoint to check environment (remove in production)
+app.get('/debug-env', (req, res) => {
+    const useFirebase = process.env.USE_FIREBASE === 'true';
+    const hasServiceAccount = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+    const projectId = process.env.FIREBASE_SERVICE_ACCOUNT 
+        ? (() => {
+            try {
+                const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                return sa.project_id;
+            } catch (e) {
+                return 'ERROR_PARSING_JSON';
+            }
+        })()
+        : 'NOT_SET';
+    res.json({
+        USE_FIREBASE: useFirebase,
+        FIREBASE_SERVICE_ACCOUNT_SET: hasServiceAccount,
+        PROJECT_ID: projectId,
+        NETLIFY: !!process.env.NETLIFY,
+    });
+});
+
 try {
   app.use('/api', chatRoutes());
 } catch (error) {

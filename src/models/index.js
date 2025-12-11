@@ -28,4 +28,18 @@ const db = {
   Order: sequelize ? Order(sequelize, Sequelize.DataTypes) : null,
 };
 
+// If sequelize couldn't be initialized (e.g. in serverless runtime without DB),
+// provide lightweight mock models to avoid throwing errors on read endpoints.
+if (!sequelize) {
+  const createMockModel = (name) => ({
+    findAll: async () => [],
+    findByPk: async () => null,
+    create: async (data) => ({ id: 0, ...data }),
+  });
+
+  db.Message = createMockModel('Message');
+  db.Menu = createMockModel('Menu');
+  db.Order = createMockModel('Order');
+}
+
 module.exports = db;
