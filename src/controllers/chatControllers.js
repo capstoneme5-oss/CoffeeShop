@@ -225,34 +225,84 @@ class CoffeeshopController {
         try {
             const { customerName, items, notes } = req.body;
             
+            // Validate input
+            if (!customerName || !items || items.length === 0) {
+                return res.status(400).json({ error: 'Customer name and items are required' });
+            }
+
             // Calculate total price
             let totalPrice = 0;
             for (const item of items) {
-                const menuItem = await db.Menu.findByPk(item.menuItemId);
-                if (!menuItem) {
-                    return res.status(404).json({ error: `Menu item ${item.menuItemId} not found` });
-                }
-                totalPrice += menuItem.price * item.quantity;
+                totalPrice += (item.price || 0) * item.quantity;
             }
 
-            const order = await db.Order.create({
-                customerName,
-                items,
-                totalPrice,
-                notes,
-                status: 'Pending',
-            });
-            
-            // Save order confirmation message
-            const orderMessage = `Order placed for ${customerName}. Order ID: ${order.id}. Total: ₱${parseFloat(order.totalPrice).toFixed(2)}`;
-            await db.Message.create({
-                content: orderMessage,
-                sender: 'bot',
-            });
+            let order = null;
 
-            res.status(201).json(order);
+            // Try to save to MySQL first (if available)
+            if (db && db.Order && typeof db.Order.create === 'function') {
+                try {
+                    order = await db.Order.create({
+                        customerName,
+                        items,
+                        totalPrice,
+                        notes,
+                        status: 'Pending',
+                    });
+                    console.log('Order saved to MySQL:', order.id);
+                } catch (dbErr) {
+                    console.warn('Failed to save order to MySQL:', dbErr && dbErr.message ? dbErr.message : dbErr);
+                    // Continue to try Firestore
+                }
+            }
+
+            // Try to save to Firestore if enabled and MySQL failed
+            if (!order && process.env.USE_FIREBASE === 'true') {
+                try {
+                    const orderRef = await firebaseClient.createOrder({
+                        customerName,
+                        items,
+                        totalPrice,
+                        notes,
+                        status: 'Pending',
+                        createdAt: new Date().toISOString(),
+                    });
+                    order = {
+                        id: orderRef.id || 'firebase-order',
+                        customerName,
+                        items,
+                        totalPrice,
+                        notes,
+                        status: 'Pending',
+                    };
+                    console.log('Order saved to Firestore:', orderRef.id);
+                } catch (firebaseErr) {
+                    console.warn('Failed to save order to Firestore:', firebaseErr && firebaseErr.message ? firebaseErr.message : firebaseErr);
+                }
+            }
+
+            // If order was created, return it
+            if (order) {
+                // Try to save order confirmation message (optional, don't fail if it doesn't work)
+                try {
+                    const orderMessage = `Order placed for ${customerName}. Order ID: ${order.id}. Total: ₱${parseFloat(order.totalPrice).toFixed(2)}`;
+                    if (process.env.USE_FIREBASE === 'true') {
+                        await firebaseClient.createMessage({ content: orderMessage, sender: 'bot' });
+                    } else if (db && db.Message && typeof db.Message.create === 'function') {
+                        await db.Message.create({ content: orderMessage, sender: 'bot' });
+                    }
+                } catch (msgErr) {
+                    console.warn('Failed to save order message:', msgErr && msgErr.message ? msgErr.message : msgErr);
+                    // Don't fail the order if message save fails
+                }
+
+                return res.status(201).json(order);
+            }
+
+            // If we get here, order creation failed on both backends
+            return res.status(500).json({ error: 'Failed to create order. Please try again later.' });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            console.error('createOrder error:', error && error.message ? error.message : error);
+            res.status(500).json({ error: error.message || 'Error creating order' });
         }
     }
 

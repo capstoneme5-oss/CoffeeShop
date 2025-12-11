@@ -101,9 +101,31 @@ async function createMessage(data) {
   }
 }
 
+async function createOrder(data) {
+  const db = getFirestore();
+  if (!db) return null;
+  try {
+    const docRef = await db.collection('orders').add({
+      customerName: data.customerName,
+      items: data.items,
+      totalPrice: data.totalPrice,
+      notes: data.notes || '',
+      status: data.status || 'Pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    const created = await docRef.get();
+    return { id: created.id, ...created.data() };
+  } catch (err) {
+    console.warn('Firebase createOrder error:', err && err.message ? err.message : err);
+    return null;
+  }
+}
+
 module.exports = {
   getMenuItems,
   getBestsellers,
   getMessages,
   createMessage,
+  createOrder,
 };
