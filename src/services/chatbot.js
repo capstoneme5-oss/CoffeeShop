@@ -34,7 +34,7 @@ class ChatbotService {
                 ]
             },
             coffee_recommendation: {
-                patterns: ['recommend', 'suggest', 'best coffee', 'what should i order', 'favorite', 'popular', 'most ordered'],
+                patterns: ['recommend', 'suggest', 'best coffee', 'what should i order', 'favorite', 'popular', 'most ordered', 'what would you recommend', 'can you recommend', 'suggest me'],
                 responses: [
                     'Our bestselling coffees are: 🌟 Cappuccino (₱180) - espresso with velvety steamed milk, perfect balance! 🌟 Latte (₱200) - smooth and creamy, coffee with lots of milk. 🌟 Mocha (₱220) - espresso with chocolate, best for chocolate lovers! 🌟 Iced Coffee (₱180) - refreshing on warm days. All amazing choices!',
                     'Try our Cappuccino - it\'s our #1 bestseller! Espresso blended perfectly with steamed milk for that ideal taste. If you like something sweeter, our Mocha (with chocolate) is divine! Can\'t decide? Start with Cappuccino!',
@@ -163,7 +163,7 @@ class ChatbotService {
                 ]
             },
             website_features: {
-                patterns: ['website', 'website features', 'what can i do', 'how does website work', 'browse', 'app', 'platform'],
+                patterns: ['website', 'website features', 'what can i do', 'how does website work', 'browse', 'app', 'platform', 'web', 'on this web'],
                 responses: [
                     '🌐 WEBSITE FEATURES: ☕ Browse Menu - View all items with photos, descriptions, and prices. ⭐ Best Sellers - See our most popular items. 💬 Chat with Bot - I\'m here to answer questions anytime! 🛒 Shopping Cart - Add items, adjust quantities, review totals. 📝 Checkout - Easy order placement with customer details. 📱 Mobile-friendly - Works on all devices! Simple, intuitive, convenient!',
                     'Our website is designed for easy shopping! Browse our menu with photos and descriptions, check bestsellers, add items to cart, chat with me anytime for questions, and checkout securely. Everything you need in one place!',
@@ -264,11 +264,22 @@ class ChatbotService {
     async generateResponse(userMessage, menuItems = []) {
         const lowerMessage = userMessage.toLowerCase();
         
-        // Check for intent matches in knowledge base
-        for (const [intent, data] of Object.entries(this.knowledgeBase)) {
-            for (const pattern of data.patterns) {
-                if (lowerMessage.includes(pattern) || lowerMessage.includes(pattern + 's')) {
-                    return this.selectRandomResponse(data.responses);
+        // Priority order: check more specific patterns first, then general ones
+        const priorityOrder = [
+            'menu', 'coffee_recommendation', 'pricing', 'order_process', 'specialties', 
+            'pastry', 'tea', 'sandwich', 'bestseller', 'website_features', 'payment_methods',
+            'faq', 'loyalty', 'delivery', 'contact', 'about', 'location', 'hours', 'quality',
+            'ingredients', 'help', 'thanks', 'goodbye', 'greeting'
+        ];
+        
+        // Check patterns in priority order (more specific first)
+        for (const intent of priorityOrder) {
+            if (this.knowledgeBase[intent]) {
+                const data = this.knowledgeBase[intent];
+                for (const pattern of data.patterns) {
+                    if (lowerMessage.includes(pattern) || lowerMessage.includes(pattern + 's')) {
+                        return this.selectRandomResponse(data.responses);
+                    }
                 }
             }
         }
