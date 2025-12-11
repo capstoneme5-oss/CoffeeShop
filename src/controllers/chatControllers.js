@@ -88,96 +88,100 @@ class CoffeeshopController {
     // Menu operations
     async getMenu(req, res) {
         try {
-            console.log('getMenu called. USE_FIREBASE:', process.env.USE_FIREBASE, 'NETLIFY:', process.env.NETLIFY);
-            
-            // If Firebase is enabled, return Firebase menu
+            // If Firebase is enabled, try it first
             if (process.env.USE_FIREBASE === 'true') {
-                console.log('Attempting Firebase getMenuItems...');
                 const fbItems = await firebaseClient.getMenuItems();
-                console.log('Firebase returned', fbItems ? fbItems.length : 0, 'items');
-                if (fbItems && fbItems.length > 0) return res.json(fbItems);
-            }
-            // If running on Netlify without DB, prefer bundled sample
-            if (process.env.NETLIFY) {
-                try {
-                    console.log('Loading bundled sample menu for Netlify...');
-                    const data = require('../data/menu.json');
-                    return res.json(Array.isArray(data) ? data.filter(i => i.available) : []);
-                } catch (e) {
-                    console.warn('Failed to load bundled sample menu on Netlify:', e && e.message ? e.message : e);
+                if (fbItems && fbItems.length > 0) {
+                    console.log('Served', fbItems.length, 'menu items from Firestore');
+                    return res.json(fbItems);
                 }
             }
 
-            const menuItems = await db.Menu.findAll({
-                where: { available: true },
-            });
-            // If DB returned empty, use internal static fallback bundled with the function
-            if (!menuItems || (Array.isArray(menuItems) && menuItems.length === 0)) {
-                try {
-                    const data = require('../data/menu.json');
-                    return res.json(Array.isArray(data) ? data.filter(i => i.available) : []);
-                } catch (fallbackErr) {
-                    console.warn('Failed to load internal fallback menu:', fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr);
+            // Try MySQL database
+            try {
+                if (db && db.Menu && typeof db.Menu.findAll === 'function') {
+                    const menuItems = await db.Menu.findAll({
+                        where: { available: true },
+                    });
+                    if (menuItems && menuItems.length > 0) {
+                        console.log('Served', menuItems.length, 'menu items from MySQL');
+                        return res.json(menuItems);
+                    }
                 }
+            } catch (dbErr) {
+                console.warn('MySQL menu query failed:', dbErr && dbErr.message ? dbErr.message : dbErr);
             }
-            res.json(menuItems);
+
+            // Fallback to bundled sample menu
+            try {
+                const data = require('../data/menu.json');
+                const filtered = Array.isArray(data) ? data.filter(i => i.available !== false) : [];
+                console.log('Served', filtered.length, 'menu items from bundled JSON');
+                return res.json(filtered);
+            } catch (fallbackErr) {
+                console.warn('Failed to load bundled menu:', fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr);
+                return res.json([]);
+            }
         } catch (error) {
             console.error('getMenu error:', error && error.message ? error.message : error);
-            // Return empty list so frontend doesn't break when DB is unavailable
             res.json([]);
         }
     }
 
     async getBestsellers(req, res) {
         try {
-            // If Firebase is enabled, return Firebase bestsellers
-            if (process.env.USE_FIREBASE === 'true') {
-                const fbSellers = await firebaseClient.getBestsellers(req.query.limit || 6);
-                if (fbSellers && fbSellers.length > 0) return res.json(fbSellers);
-            }
-
-            // If running on Netlify without DB, prefer bundled sample
-            if (process.env.NETLIFY) {
-                try {
-                    const data = require('../data/menu.json');
-                    const limit = req.query.limit || 6;
-                    if (Array.isArray(data)) {
-                        const sellers = data.filter(i => i.available && i.isBestseller).sort((a,b) => (b.salesCount||0)-(a.salesCount||0)).slice(0, parseInt(limit));
-                        return res.json(sellers);
-                    }
-                    return res.json([]);
-                } catch (e) {
-                    console.warn('Failed to load bundled sample bestsellers on Netlify:', e && e.message ? e.message : e);
-                }
-            }
-
             const limit = req.query.limit || 6;
-            const bestsellers = await db.Menu.findAll({
-                where: { 
-                    available: true,
-                    isBestseller: true 
-                },
-                order: [['salesCount', 'DESC']],
-                limit: parseInt(limit),
-            });
-            // If DB returned empty, use internal static fallback bundled with the function
-            if (!bestsellers || (Array.isArray(bestsellers) && bestsellers.length === 0)) {
-                try {
-                    const data = require('../data/menu.json');
-                    if (Array.isArray(data)) {
-                        const sellers = data.filter(i => i.available && i.isBestseller).sort((a,b) => (b.salesCount||0)-(a.salesCount||0)).slice(0, parseInt(limit));
-                        return res.json(sellers);
-                    }
-                } catch (fallbackErr) {
-                    console.warn('Failed to load internal fallback bestsellers:', fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr);
+
+            // If Firebase is enabled, try it first
+            if (process.env.USE_FIREBASE === 'true') {
+                const fbSellers = await firebaseClient.getBestsellers(limit);
+                if (fbSellers && fbSellers.length > 0) {
+                    console.log('Served', fbSellers.length, 'bestsellers from Firestore');
+                    return res.json(fbSellers);
                 }
             }
-            res.json(bestsellers);
+
+            // Try MySQL database
+            try {
+                if (db && db.Menu && typeof db.Menu.findAll === 'function') {
+                    const bestsellers = await db.Menu.findAll({
+                        where: { 
+                            available: true,
+                            isBestseller: true 
+                        },
+                        order: [['salesCount', 'DESC']],
+                        limit: parseInt(limit),
+                    });
+                    if (bestsellers && bestsellers.length > 0) {
+                        console.log('Served', bestsellers.length, 'bestsellers from MySQL');
+                        return res.json(bestsellers);
+                    }
+                }
+            } catch (dbErr) {
+                console.warn('MySQL bestsellers query failed:', dbErr && dbErr.message ? dbErr.message : dbErr);
+            }
+
+            // Fallback to bundled sample bestsellers
+            try {
+                const data = require('../data/menu.json');
+                if (Array.isArray(data)) {
+                    const sellers = data
+                        .filter(i => i.available !== false && i.isBestseller)
+                        .sort((a,b) => (b.salesCount||0)-(a.salesCount||0))
+                        .slice(0, parseInt(limit));
+                    console.log('Served', sellers.length, 'bestsellers from bundled JSON');
+                    return res.json(sellers);
+                }
+            } catch (fallbackErr) {
+                console.warn('Failed to load bundled bestsellers:', fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr);
+            }
+
+            return res.json([]);
         } catch (error) {
             console.error('getBestsellers error:', error && error.message ? error.message : error);
-            // Return empty list on error to keep UI usable
             res.json([]);
         }
+    }
     }
 
     async addMenuItem(req, res) {
