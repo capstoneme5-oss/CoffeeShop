@@ -107,7 +107,7 @@ class ChatbotService {
                 ]
             },
             quality: {
-                patterns: ['quality', 'fresh', 'good', 'best', 'excellent', 'taste'],
+                patterns: ['quality', 'fresh', 'good', 'excellent', 'taste'],
                 responses: [
                     'We pride ourselves at BrewHeaven Cafe on using high-quality beans and fresh ingredients! Every drink is made with care. ☕✨',
                     'Quality is our priority at BrewHeaven Cafe! We use premium coffee beans and prepare everything fresh.',
@@ -139,7 +139,7 @@ class ChatbotService {
         // Check for intent matches in knowledge base
         for (const [intent, data] of Object.entries(this.knowledgeBase)) {
             for (const pattern of data.patterns) {
-                if (lowerMessage.includes(pattern)) {
+                if (lowerMessage.includes(pattern) || lowerMessage.includes(pattern + 's')) {
                     return this.selectRandomResponse(data.responses);
                 }
             }
@@ -283,8 +283,21 @@ Guidelines:
     }
 
     async getContextualResponse(userMessage, menuItems = []) {
-        // Use the enhanced smart response that includes Gemini and menu context
-        return await this.getSmartResponse(userMessage, menuItems);
+        // First try pattern-based responses and Gemini via generateResponse
+        const response = await this.generateResponse(userMessage, menuItems);
+
+        // Add menu-related context if the user asked about specific coffee items
+        const lowerMessage = userMessage.toLowerCase();
+        if ((lowerMessage.includes('cappuccino') || lowerMessage.includes('latte') || 
+             lowerMessage.includes('espresso') || lowerMessage.includes('coffee')) && menuItems.length > 0) {
+            const coffeeItems = menuItems.filter(item => item.category === 'Coffee');
+            if (coffeeItems.length > 0) {
+                const itemNames = coffeeItems.map(item => `${item.name} (₱${parseFloat(item.price).toFixed(2)})`).join(', ');
+                return `${response} We have: ${itemNames}`;
+            }
+        }
+
+        return response;
     }
 }
 
